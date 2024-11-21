@@ -14,17 +14,21 @@ enum ActionType: String, CaseIterable, Identifiable {
     case convertToJPG = "Convert to JPEG"
     case adjustBrightness = "Adjust Brightness"
     case rotateImage = "Rotate Image"
-    
+    case applyFilter = "Apply Filter"
+    case convertToGrayscale = "Convert to Grayscale"
+
     var id: String { rawValue }
-    
+
     var icon: String {
         switch self {
         case .compressImage: return "arrow.down.circle"
-        case .resizeImage: return "arrow.up.left.and.arrow.down.right"
-        case .convertToPNG: return "doc.on.doc"
-        case .convertToJPG: return "doc.on.doc.fill"
+        case .resizeImage: return "aspectratio"
+        case .convertToPNG: return "doc.richtext"
+        case .convertToJPG: return "doc.plaintext"
         case .adjustBrightness: return "sun.max"
         case .rotateImage: return "rotate.right"
+        case .applyFilter: return "wand.and.stars"
+        case .convertToGrayscale: return "circle.lefthalf.fill"
         }
     }
 }

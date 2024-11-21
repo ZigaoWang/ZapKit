@@ -9,7 +9,7 @@ import SwiftUI
 
 struct StatusView: View {
     let status: FileItem.ProcessingStatus
-    
+
     var body: some View {
         HStack {
             Image(systemName: iconName)
@@ -19,24 +19,24 @@ struct StatusView: View {
                 .font(.caption)
         }
     }
-    
+
     private var iconName: String {
         switch status {
         case .pending:
             return "clock"
         case .processing:
-            return "arrow.triangle.2.circlepath"
+            return "hourglass"
         case .completed:
             return "checkmark.circle"
         case .error:
             return "exclamationmark.triangle"
         }
     }
-    
+
     private var iconColor: Color {
         switch status {
         case .pending:
-            return .secondary
+            return .gray
         case .processing:
             return .blue
         case .completed:
@@ -45,7 +45,7 @@ struct StatusView: View {
             return .red
         }
     }
-    
+
     private var statusText: String {
         switch status {
         case .pending:

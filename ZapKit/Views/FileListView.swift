@@ -6,35 +6,51 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct FileListView: View {
     @ObservedObject var processor: FileProcessor
-    
-    var body: some View {
-        List(processor.files) { file in
-            FileRowView(file: file)
-        }
-        .listStyle(InsetListStyle())
-        .frame(minWidth: 300)
-    }
-}
+    @State private var isDragging = false
 
-struct FileRowView: View {
-    let file: FileItem
-    
     var body: some View {
-        HStack {
-            Image(systemName: "doc")
-            VStack(alignment: .leading) {
-                Text(file.url.lastPathComponent)
-                    .font(.headline)
-                Text(file.url.pathExtension.uppercased())
-                    .font(.caption)
+        VStack {
+            if processor.files.isEmpty {
+                Text("No files added. Drag and drop files here.")
                     .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else {
+                List {
+                    ForEach(processor.files) { file in
+                        HStack {
+                            Text(file.url.lastPathComponent)
+                            Spacer()
+                            StatusView(status: file.status)
+                        }
+                    }
+                    .onDelete(perform: deleteFiles)
+                }
             }
-            Spacer()
-            StatusView(status: file.status)
         }
-        .padding(.vertical, 4)
+        .onDrop(of: [UTType.fileURL], isTargeted: $isDragging) { providers in
+            handleDrop(providers: providers)
+            return true
+        }
+    }
+
+    private func deleteFiles(at offsets: IndexSet) {
+        processor.files.remove(atOffsets: offsets)
+    }
+
+    private func handleDrop(providers: [NSItemProvider]) {
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                    if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        processor.addFiles([url])
+                    }
+                }
+            }
+        }
     }
 }
