@@ -11,14 +11,14 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @State private var droppedFiles: [URL] = []
     @State private var selectedFile: URL?
-    @State private var processedURL: URL?
-    @State private var selectedAction: FileAction?
+    @State private var processedFile: URL?
+    @State private var isProcessing = false
     @State private var showProcessingSheet = false
-    @State private var showSettings = false
+    @State private var selectedAction: ImageAction?
     
     var body: some View {
         NavigationSplitView {
-            // Left Sidebar - File List
+            // Left side - File List
             VStack {
                 if droppedFiles.isEmpty {
                     DropZone(files: $droppedFiles)
@@ -29,11 +29,7 @@ struct ContentView: View {
                     .listStyle(.inset)
                     
                     HStack {
-                        Button(action: {
-                            droppedFiles.removeAll()
-                            selectedFile = nil
-                            processedURL = nil
-                        }) {
+                        Button(action: clearFiles) {
                             Label("Clear All", systemImage: "trash")
                         }
                         Spacer()
@@ -44,10 +40,11 @@ struct ContentView: View {
                 }
             }
             .frame(minWidth: 250)
+            
         } content: {
             // Middle - Preview & Actions
             if let selectedFile = selectedFile {
-                VStack(spacing: 0) {
+                VStack {
                     // Preview
                     ScrollView {
                         if let image = NSImage(contentsOf: selectedFile) {
@@ -58,69 +55,34 @@ struct ContentView: View {
                         }
                     }
                     
-                    Divider()
-                    
-                    // Quick Actions
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(FileAction.quickActions) { action in
-                                QuickActionButton(action: action) {
+                    // Actions
+                    VStack(spacing: 20) {
+                        Text("Quick Actions")
+                            .font(.headline)
+                        
+                        HStack(spacing: 20) {
+                            ForEach([ImageAction.compress, .convertPNG, .resize], id: \.self) { action in
+                                ActionButton(action: action) {
                                     selectedAction = action
                                     showProcessingSheet = true
                                 }
                             }
                         }
-                        .padding()
+                        .padding(.bottom)
                     }
+                    .padding()
                     .background(Color(NSColor.controlBackgroundColor))
                 }
             } else {
-                EmptySelectionView()
+                EmptyStateView()
             }
+            
         } detail: {
-            // Right Side - Advanced Actions & Settings
-            if selectedFile != nil {
-                VStack {
-                    // Actions Groups
-                    List {
-                        Section("Image Processing") {
-                            ForEach(FileAction.imageActions) { action in
-                                ActionRowView(action: action) {
-                                    selectedAction = action
-                                    showProcessingSheet = true
-                                }
-                            }
-                        }
-                        
-                        Section("Conversion") {
-                            ForEach(FileAction.conversionActions) { action in
-                                ActionRowView(action: action) {
-                                    selectedAction = action
-                                    showProcessingSheet = true
-                                }
-                            }
-                        }
-                        
-                        Section("Optimization") {
-                            ForEach(FileAction.optimizationActions) { action in
-                                ActionRowView(action: action) {
-                                    selectedAction = action
-                                    showProcessingSheet = true
-                                }
-                            }
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Processing History
-                    if let processedURL = processedURL {
-                        ProcessingResultView(originalURL: selectedFile!, processedURL: processedURL)
-                            .padding()
-                    }
-                }
+            // Right side - Results
+            if let processedFile = processedFile {
+                ProcessedFileView(originalFile: selectedFile!, processedFile: processedFile)
             } else {
-                EmptySelectionView()
+                EmptyStateView()
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -130,24 +92,24 @@ struct ContentView: View {
                 ProcessingView(
                     url: file,
                     action: action,
-                    processedURL: $processedURL,
+                    processedURL: $processedFile,
                     isPresented: $showProcessingSheet
                 )
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "gear")
-                }
-            }
-        }
+    }
+    
+    private func clearFiles() {
+        droppedFiles.removeAll()
+        selectedFile = nil
+        processedFile = nil
+        isProcessing = false
     }
 }
 
-// MARK: - Quick Action Button
-struct QuickActionButton: View {
-    let action: FileAction
+// MARK: - Supporting Views
+struct ActionButton: View {
+    let action: ImageAction
     let onTap: () -> Void
     @State private var isHovered = false
     
@@ -156,16 +118,16 @@ struct QuickActionButton: View {
             VStack(spacing: 8) {
                 Image(systemName: action.icon)
                     .font(.system(size: 24))
-                    .foregroundColor(isHovered ? .white : action.category.color)
-                Text(action.name)
+                Text(action.rawValue)
                     .font(.caption)
-                    .foregroundColor(isHovered ? .white : .primary)
             }
+            .frame(width: 100)
             .padding()
-            .background(isHovered ? action.category.color : Color(NSColor.controlBackgroundColor))
-            .cornerRadius(12)
+            .background(action.color.opacity(isHovered ? 0.2 : 0.1))
+            .foregroundColor(action.color)
+            .cornerRadius(8)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering
@@ -174,82 +136,34 @@ struct QuickActionButton: View {
     }
 }
 
-// MARK: - Action Row View
-struct ActionRowView: View {
-    let action: FileAction
-    let onTap: () -> Void
-    @State private var isHovered = false
+struct ProcessedFileView: View {
+    let originalFile: URL
+    let processedFile: URL
     
     var body: some View {
-        Button(action: onTap) {
-            HStack {
-                Image(systemName: action.icon)
-                    .foregroundColor(action.category.color)
-                    .frame(width: 24)
-                
-                VStack(alignment: .leading) {
-                    Text(action.name)
-                    Text(action.description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+        VStack(spacing: 20) {
+            GroupBox("Processing Results") {
+                VStack(alignment: .leading, spacing: 12) {
+                    InfoRow("Original Size", getFileSize(originalFile))
+                    InfoRow("New Size", getFileSize(processedFile))
+                    InfoRow("Saved", calculateSavings())
                 }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-                    .opacity(isHovered ? 1 : 0)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovered = hovering
-            }
-        }
-    }
-}
-
-// MARK: - Processing Result View
-struct ProcessingResultView: View {
-    let originalURL: URL
-    let processedURL: URL
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Last Processing Result")
-                .font(.headline)
-            
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Original Size:")
-                    Text("New Size:")
-                    Text("Saved:")
-                }
-                .foregroundColor(.secondary)
-                
-                VStack(alignment: .leading) {
-                    Text(getFileSize(originalURL))
-                    Text(getFileSize(processedURL))
-                    Text(calculateSavings())
-                        .foregroundColor(.green)
-                }
+                .padding()
             }
             
             HStack {
                 Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([processedURL])
+                    NSWorkspace.shared.activateFileViewerSelecting([processedFile])
                 }
                 
-                Button("Save As...") {
-                    saveProcessedFile()
-                }
-                .buttonStyle(.borderedProminent)
+                Spacer()
+                
+                ShareLink(item: processedFile)
+                    .buttonStyle(.borderedProminent)
             }
+            .padding()
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(8)
     }
     
     private func getFileSize(_ url: URL) -> String {
@@ -263,8 +177,8 @@ struct ProcessingResultView: View {
     }
     
     private func calculateSavings() -> String {
-        if let originalAttributes = try? FileManager.default.attributesOfItem(atPath: originalURL.path),
-           let processedAttributes = try? FileManager.default.attributesOfItem(atPath: processedURL.path),
+        if let originalAttributes = try? FileManager.default.attributesOfItem(atPath: originalFile.path),
+           let processedAttributes = try? FileManager.default.attributesOfItem(atPath: processedFile.path),
            let originalSize = originalAttributes[.size] as? Int64,
            let processedSize = processedAttributes[.size] as? Int64 {
             let savedBytes = originalSize - processedSize
@@ -273,27 +187,34 @@ struct ProcessingResultView: View {
         }
         return "Unknown"
     }
+}
+
+struct InfoRow: View {
+    let label: String
+    let value: String
     
-    private func saveProcessedFile() {
-        let savePanel = NSSavePanel()
-        savePanel.nameFieldStringValue = "processed_\(originalURL.lastPathComponent)"
-        
-        if savePanel.runModal() == .OK {
-            if let url = savePanel.url {
-                try? FileManager.default.copyItem(at: processedURL, to: url)
-            }
+    init(_ label: String, _ value: String) {
+        self.label = label
+        self.value = value
+    }
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
         }
     }
 }
 
-// MARK: - Empty Selection View
-struct EmptySelectionView: View {
+struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("Select a file to start processing")
+            Text("No File Selected")
                 .font(.title2)
                 .foregroundStyle(.secondary)
         }

@@ -9,10 +9,9 @@ import SwiftUI
 
 struct ProcessingView: View {
     let url: URL
-    let action: FileAction
+    let action: ImageAction
     @Binding var processedURL: URL?
     @Binding var isPresented: Bool
-    @State private var progress = 0.0
     @State private var error: Error?
     
     var body: some View {
@@ -55,7 +54,7 @@ struct ProcessingView: View {
                     ProgressView()
                         .scaleEffect(1.5)
                         .padding()
-                    Text("Processing \(action.name)")
+                    Text("Processing \(action.rawValue)")
                         .font(.headline)
                     Text("Please wait...")
                         .foregroundColor(.secondary)
@@ -72,7 +71,7 @@ struct ProcessingView: View {
     private func startProcessing() {
         Task {
             do {
-                processedURL = try await action.processor(url)
+                processedURL = try await action.process(url)
             } catch {
                 self.error = error
             }
