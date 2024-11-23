@@ -13,5 +13,6 @@ struct ZapKitApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
     }
 }
